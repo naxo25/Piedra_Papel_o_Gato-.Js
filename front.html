@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title> Cachipun.js </title>
+
+  <style>
+  	td{
+  		padding: 30px
+  	}
+  </style>
+
+  <link href="https://cdn.jsdelivr.net/npm/quasar@1.14.3/dist/quasar.min.css" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons" rel="stylesheet" type="text/css">
+
+</head>
+
+<body>
+
+<div id="app" style="margin-top: -5%"> 
+
+	<div v-show='!show' class="absolute-center">
+		Player 1: <q-input type="text" v-model='names[0]' placeholder="jugador 1"></q-input> <br><br>
+		Player 2: <q-input type="text" v-model='names[1]' placeholder="Jugador 2"></q-input> <br><br>
+		<p id='alerta' style="color: red; display: none;">Complete los campos.</p>
+		<q-btn icon='play_arrow' @click='init_game'>Start</q-btn>
+		<q-btn icon='settings' color='black' @click="config_game = true">Config game</q-btn>
+	</div>
+
+		<div v-show="show && tab == 'game'" style="width: 40%; margin: auto; margin-top: 15em">
+
+			<center>
+				<h3>Round {{ turno_actual+1 }}</h3>
+				<h5>{{ names[turno_actual] }}</h5>
+			<q-item style='width: 60%;'>
+				<q-item-section>
+					Seleccionar Movimiento 
+					<q-select v-model="move" :options="movimientos"> </q-select> <br>
+					<q-btn icon='done' flat color='blue' @click='play'>Ok</q-btn>
+				</q-item-section>
+			</q-item>
+			</center>
+
+		</div>
+
+		<div v-show="show && tab == 'reset'" style="width: 30%; margin: auto; margin-top: 5em">
+
+			<q-item>
+				<q-item-section>
+
+					<h2> We have a WINNER!! </h2>
+					<h5> {{ Winner }} is the new EMPEROR! </h5>
+					<q-btn icon='play_arrow' color='blue' @click='init_game'>Start</q-btn><br>
+					<q-btn icon='settings' @click="config_game = true" label='Config game'></q-btn>
+
+				</q-item-section>
+			</q-item>
+
+		</div>
+
+	    <q-dialog v-model="config_game">
+	      <q-card>
+	        <q-card-section>
+	        	<table>
+	        		<thead class="text-weight-bold">
+	        			<tr>
+		        		</tr>
+	        			<tr>
+		        			<td> Move </td>
+		        			<td> Kills </td>
+	        				<td>
+			        			<q-btn flat round icon='add' @click='dialog_config_move = true, move_new = {}, dialog_edit = false' color='green-8'></q-btn>
+			        			<q-btn flat round icon="close" color="black" v-close-popup></q-btn>
+		        			</td>
+		        		</tr>
+	        		</thead>
+	        		<tbody v-for='(move,index) in moves'>
+	        			<tr>
+	        				<td> {{ move.move }} </td>
+	        				<td> {{ move.kills }} </td>
+	        				<td> <q-btn flat round icon='edit' @click='open_dialog(move), id_edit = index, dialog_edit = true' color='blue'></q-btn>
+	        					 <q-btn flat round icon='delete' @click='delete_move(index)' color='red'></q-btn>
+	        				</td>
+	        			</tr>
+	        		</tbody>
+	        	</table>
+	        </q-card-section>
+
+	      </q-card>
+	    </q-dialog>
+
+	<q-table 
+		v-show='show && tab == "game"'
+		v-if='games != 0'
+		class='absolute-left'
+		:data='games'	
+	    virtual-scroll
+	    :rows-per-page-options="[0]"
+	></q-table>
+
+	<q-table 
+		v-show='show && tab == "game"'
+		v-if='Winners != 0'
+		class='absolute-right'
+		:data='Winners'	
+	    virtual-scroll
+	    :rows-per-page-options="[0]"
+	></q-table>
+
+    <q-dialog v-model="alert">
+      <q-card>
+        <q-card-section>
+          <div class="text-h6">Mensaje</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+        	{{ msj }}
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="OK" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="dialog_config_move">
+      <q-card>
+	    <q-card-section>
+	      <div class="text-h6">Move</div>
+	    </q-card-section>
+
+	    <q-card-section class="q-pt-none">
+	    	<q-input required placeholder='Nombre movimiento' v-model='move_new.move'></q-input>
+	    	<q-input required placeholder='Que gana?' v-model='move_new.kills'></q-input>
+	    </q-card-section>
+
+	    <q-card-actions align="right">
+	      <q-btn v-if="!dialog_edit" flat label="Add" color="primary" @click='add_move' v-close-popup></q-btn> 
+	      <q-btn v-else flat label="Edit" color="primary" @click='edit_move' v-close-popup></q-btn> 
+	      <q-btn flat label="Close" color="black" v-close-popup></q-btn>
+	    </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+
+</div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quasar@1.14.3/dist/quasar.umd.min.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script>
+
+	new Vue({
+
+        el: '#app',
+        data: {
+        	tab: 'game',
+        	turno_actual: 0,
+        	dialog_edit: false, // controla el modo del modal
+        	show: false, alert: false, config_game: false, dialog_config_move: false,
+        	names: {},
+      		move: null, // El movimiento se deposita aqui
+      		moves_game:[], // Guarda los movimientos de los jugadores
+      		move_new: { move: '', kills:'' },
+      		cont_gano: { 0:3, 1:0 }, round: 1, id_edit: '',
+      		
+      		games: [], Winners: [], moves: [],
+
+      		url: 'http://localhost:4000', // Puerto backend
+      		game: { move:[], resultado:'' }, // Array para guardar en backend
+      		msj: '', /*alerta*/ Winner:'',
+        },
+        computed: {
+        	//Hago una propiedad computada para detectar cambios en moves e ir actualizandose con el backend
+        	movimientos(){
+	        	let arr = [];
+				Object.keys(this.moves).forEach(key => {
+					arr[key] = this.moves[key].move;
+				});
+				return arr;
+			}
+        },
+        mounted() {
+        	// Pido al backend los datos
+        	axios.get(this.url+'/moves').then(respuesta => { 
+        		this.moves = respuesta.data;
+        	})
+        	// Guardo los ganadores 
+		    if (localStorage.Winners) {
+		      var parse = JSON.parse(localStorage.getItem('Winners'));
+		      this.Winners = parse
+		      this.round = parse.length + 1;
+		    }
+        },
+        methods: {
+
+        	add_move() {
+				axios.post(this.url+'/moves', this.move_new).then(movimiento_nuevo => {
+					this.moves.push(movimiento_nuevo.data)
+				})
+				this.move_new = {} //limpio
+        	},
+        	open_dialog(movimiento) {
+        		// Configuro el modal para editar y asigno el movimiento para no modificar el original
+        		this.dialog_config_move = true;
+				this.move_new = Object.assign({}, movimiento)
+        	},
+        	edit_move() {
+				axios.put(this.url+'/moves/'+this.id_edit, this.move_new).then(movimiento_editado => {
+					this.moves[this.id_edit] = movimiento_editado.data
+				})
+				this.dialog_edit = false; // modal en modo editar
+        	},
+        	delete_move(id) {
+				axios.delete(this.url+'/moves/'+id)
+				this.moves.splice(id, 1)
+        	},
+
+        	init_game() {
+
+        		if (this.names[0] && this.names[1] && this.moves.length > 0) {
+
+        			this.show = true
+        			this.tab = 'game'
+        			this.games = []
+	        		this.cont_gano = { 0:0, 1:0 };
+
+        		} else if (!this.names[0] && !this.names[1]) {
+        			document.getElementById('alerta').style.display = 'block'
+        			this.alert = true
+        			this.msj = 'Completa los campos';
+        		} else if (this.moves.length == 0) {
+        			this.alert = true
+        			this.msj = 'No se puede jugar sin movimientos';
+        		}
+
+        	},
+
+        	play() {
+
+        		let x = this; // reemplazo this con x apuntando a su direccion de memoria
+        		if (x.move == null) {
+        			x.alert = true
+        			x.msj = 'Debe seleccionar un movimiento';
+
+        		} else {
+
+					x.game.move[x.turno_actual] = x.move // game va al backend
+        			x.moves_game[x.turno_actual] = x.move; //Guardar la jugada
+
+        			if (x.turno_actual == 1) {
+
+        				var movimiento = x.moves_game;
+        				if (movimiento[0] != movimiento[1]) {
+        					
+        					// Busco a que gana el movimiento
+        					var deb1 = x.moves.find(kills => kills.move == movimiento[0] ); 
+        					var deb2 = x.moves.find(kills => kills.move == movimiento[1] );
+
+        					// Comparo quien gano
+        					var gano = 'nadie';
+        					if (deb1.kills == movimiento[1]) gano = 0
+        					if (deb2.kills == movimiento[0]) gano = 1
+
+        					// Si nadie gano
+        					if (gano == 'nadie') {
+								x.game.resultado = 'nadie' 
+        					} else {
+								x.game.resultado = x.names[gano] // nombre ganador
+								x.cont_gano[gano]++ // sumo victoria
+        					}
+
+							//Si un jugador gana 3 se dirige a otra pantalla y se guarda su victoria
+							if (x.cont_gano[gano] > 2) {
+			        			x.Winner = x.names[gano];
+			        			x.tab = 'reset';
+			        			x.Winners.push({ Round: this.round, Winner: x.Winner});
+			        			const g = JSON.stringify(x.Winners)
+							    localStorage.setItem('Winners', g);
+							    this.round++
+							}
+
+        				} else {
+        					x.game.resultado = 'empate'
+        				}
+
+        				//Guarda las games
+        				axios.post(x.url, x.game).then(res => {
+        					x.games.push(res.data);
+        				})
+        			}
+
+        			x.turno_actual != 1 ? x.turno_actual++ : x.turno_actual--;
+        			x.move = null;
+        		}
+        	}
+        }
+
+    });  
+
+  </script>
+</body>
+</html>
