@@ -5,6 +5,9 @@ const bodyParser = require('body-parser');
 app.use(bodyParser.json());
 app.use(cors());
 
+/**
+ * Comentario de ejemplo con DocBlock
+ */
 
 const moves = [
   { move: "paper", kills: "rock"},
